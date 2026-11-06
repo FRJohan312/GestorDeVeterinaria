@@ -5,4 +5,11 @@ __pycache__/
 *.db
 *.sqlite3
 .pytest_cache/
-.vscode/data/
+.vscode/
+data/
+tests/
+
+# Archivos
+CasoDeUso.txt
+Clases.txt
+Doc.docx
