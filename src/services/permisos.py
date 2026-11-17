@@ -1,0 +1,12 @@
+"""Permisos de los servicios actuales y de las futuras operaciones."""
+
+PERMISOS_POR_ROL = {
+    "ADMINISTRADOR": frozenset({
+        "gestionar_propietarios", "gestionar_mascotas", "gestionar_citas",
+        "consultar_consultas", "consultar_historial", "gestionar_usuarios", "usar_pruebas",
+    }),
+    "VETERINARIO": frozenset({
+        "consultar_propietarios", "consultar_mascotas", "consultar_citas",
+        "registrar_consultas", "consultar_historial",
+    }),
+}
