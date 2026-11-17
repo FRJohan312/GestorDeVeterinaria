@@ -1,4 +1,4 @@
-# Gestor de Veterinaria
+# Gestor De Veterinaria
 
 Sistema de escritorio para la gestión de clínicas veterinarias.
 

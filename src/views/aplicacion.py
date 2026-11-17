@@ -10,12 +10,14 @@ from services.autenticacion import (
 )
 from services.prototipo import contar_registros, guardar_prueba
 from services.propietarios import ServicioPropietarios
+from services.mascotas import ServicioMascotas
 from services.usuarios import ServicioUsuarios
 from .configuracion_inicial import ConfiguracionInicial
 from .dashboard import Dashboard
 from .login import Login
 from .pruebas import Pruebas
 from .propietarios import FormularioPropietario, Propietarios
+from .mascotas import FormularioMascota, Mascotas
 from .usuarios import FormularioContrasena, FormularioUsuario, Usuarios
 
 
@@ -28,6 +30,7 @@ class Aplicacion(tk.Tk):
         self.autenticacion = autenticacion
         self.servicio_usuarios = ServicioUsuarios(autenticacion)
         self.servicio_propietarios = ServicioPropietarios(autenticacion)
+        self.servicio_mascotas = ServicioMascotas(autenticacion)
         self.vista = None
         self.title("Gestor De Veterinaria")
         self.geometry("660x620")
@@ -44,6 +47,7 @@ class Aplicacion(tk.Tk):
             raise
 
     def _cambiar_vista(self, clase, **opciones):
+        self.minsize(560, getattr(clase, "alto_minimo", 580))
         if self.vista is not None:
             self.vista.destroy()
         self.vista = clase(self, **opciones)
@@ -91,15 +95,19 @@ class Aplicacion(tk.Tk):
                 on_pruebas=self.mostrar_pruebas, on_logout=self.cerrar_sesion,
                 on_usuarios=self.mostrar_usuarios,
                 on_propietarios=self.mostrar_propietarios,
+                on_mascotas=self.mostrar_mascotas,
             )
 
-    def _operar_propietarios(self, operacion, al_completar):
+    def _operar_modulo(self, operacion, al_completar):
         try:
             resultado = operacion()
         except PermisoDenegado as error:
             self._acceso_denegado(str(error))
         except ErrorValidacion as error:
-            self.vista.mostrar_error(str(error))
+            if hasattr(self.vista, "mostrar_error"):
+                self.vista.mostrar_error(str(error))
+            else:
+                messagebox.showerror("Gestor De Veterinaria", str(error), parent=self)
         except sqlite3.Error:
             if hasattr(self.vista, "mostrar_error"):
                 self.vista.mostrar_error(ERROR_DATOS)
@@ -123,19 +131,22 @@ class Aplicacion(tk.Tk):
                 on_seleccionar=self._detalle_propietario,
                 on_registrar=lambda: self._registrar_propietario(busqueda),
                 on_editar=lambda id: self._editar_propietario(id, busqueda),
+                on_mascotas=lambda id: self.mostrar_mascotas(
+                    propietario_id=id, volver=lambda: self.mostrar_propietarios(busqueda=busqueda),
+                ),
                 on_volver=self.mostrar_dashboard,
             )
             if mensaje:
                 self.vista.mensaje.set(mensaje)
-        self._operar_propietarios(consultar, mostrar)
+        self._operar_modulo(consultar, mostrar)
 
     def _detalle_propietario(self, propietario_id):
-        self._operar_propietarios(
+        self._operar_modulo(
             lambda: self.servicio_propietarios.obtener(propietario_id), self.vista.mostrar_detalle,
         )
 
     def _registrar_propietario(self, busqueda=""):
-        self._operar_propietarios(
+        self._operar_modulo(
             lambda: self.autenticacion.exigir_permiso("gestionar_propietarios"),
             lambda _: self._cambiar_vista(
                 FormularioPropietario, on_submit=self._guardar_propietario_nuevo,
@@ -144,7 +155,7 @@ class Aplicacion(tk.Tk):
         )
 
     def _guardar_propietario_nuevo(self, **datos):
-        self._operar_propietarios(
+        self._operar_modulo(
             lambda: self.servicio_propietarios.registrar(**datos),
             lambda propietario: self.mostrar_propietarios(
                 mensaje="Propietario registrado correctamente.", seleccionar=propietario.id,
@@ -160,14 +171,69 @@ class Aplicacion(tk.Tk):
             self._cambiar_vista(
                 FormularioPropietario, propietario=propietario,
                 on_cancel=lambda: self.mostrar_propietarios(busqueda=busqueda),
-                on_submit=lambda **datos: self._operar_propietarios(
+                on_submit=lambda **datos: self._operar_modulo(
                     lambda: self.servicio_propietarios.modificar(propietario_id, **datos),
                     lambda actualizado: self.mostrar_propietarios(
                         mensaje="Propietario actualizado correctamente.", seleccionar=actualizado.id,
                     ),
                 ),
             )
-        self._operar_propietarios(consultar, mostrar)
+        self._operar_modulo(consultar, mostrar)
+
+    def mostrar_mascotas(self, busqueda="", propietario_id=None, mensaje="", seleccionar=None, volver=None):
+        volver = volver or self.mostrar_dashboard
+
+        def consultar():
+            mascotas = self.servicio_mascotas.buscar(busqueda, propietario_id)
+            propietarios = self.servicio_mascotas.propietarios_disponibles()
+            permisos = self.autenticacion.permisos_actuales()
+            return mascotas, propietarios, "gestionar_mascotas" in permisos
+
+        def mostrar(resultado):
+            mascotas, propietarios, puede_gestionar = resultado
+            self._cambiar_vista(
+                Mascotas, mascotas=mascotas, propietarios=propietarios, puede_gestionar=puede_gestionar,
+                busqueda=busqueda, propietario_id=propietario_id, seleccionar=seleccionar,
+                on_buscar=lambda texto, id: self.mostrar_mascotas(texto, id, volver=volver),
+                on_seleccionar=self._detalle_mascota,
+                on_registrar=lambda: self._formulario_mascota(propietario_id=propietario_id, volver=volver),
+                on_editar=lambda id: self._formulario_mascota(id, propietario_id, volver),
+                on_propietarios=self.mostrar_propietarios, on_volver=volver,
+            )
+            if mensaje:
+                self.vista.mensaje.set(mensaje)
+        self._operar_modulo(consultar, mostrar)
+
+    def _detalle_mascota(self, mascota_id):
+        self._operar_modulo(lambda: self.servicio_mascotas.obtener(mascota_id), self.vista.mostrar_detalle)
+
+    def _formulario_mascota(self, mascota_id=None, propietario_id=None, volver=None):
+        def consultar():
+            self.autenticacion.exigir_permiso("gestionar_mascotas")
+            propietarios = self.servicio_mascotas.propietarios_disponibles()
+            if not propietarios:
+                raise ErrorValidacion("Registre primero un propietario en el módulo Propietarios.")
+            mascota = self.servicio_mascotas.obtener(mascota_id) if mascota_id is not None else None
+            return mascota, propietarios
+
+        def guardar(**datos):
+            operacion = (lambda: self.servicio_mascotas.registrar(**datos)) if mascota_id is None else (
+                lambda: self.servicio_mascotas.modificar(mascota_id, **datos)
+            )
+            self._operar_modulo(operacion, lambda mascota: self.mostrar_mascotas(
+                propietario_id=mascota.propietario_id if propietario_id is not None else None,
+                mensaje="Mascota registrada correctamente." if mascota_id is None else "Mascota actualizada correctamente.",
+                seleccionar=mascota.id, volver=volver,
+            ))
+
+        def mostrar(resultado):
+            mascota, propietarios = resultado
+            self._cambiar_vista(
+                FormularioMascota, propietarios=propietarios, mascota=mascota,
+                propietario_id=propietario_id, on_submit=guardar,
+                on_cancel=lambda: self.mostrar_mascotas(propietario_id=propietario_id, volver=volver),
+            )
+        self._operar_modulo(consultar, mostrar)
 
     def _operar_usuarios(self, operacion, al_completar):
         try:
