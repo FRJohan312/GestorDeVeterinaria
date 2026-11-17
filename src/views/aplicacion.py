@@ -9,11 +9,13 @@ from services.autenticacion import (
     PermisoDenegado, ServicioAutenticacion,
 )
 from services.prototipo import contar_registros, guardar_prueba
+from services.propietarios import ServicioPropietarios
 from services.usuarios import ServicioUsuarios
 from .configuracion_inicial import ConfiguracionInicial
 from .dashboard import Dashboard
 from .login import Login
 from .pruebas import Pruebas
+from .propietarios import FormularioPropietario, Propietarios
 from .usuarios import FormularioContrasena, FormularioUsuario, Usuarios
 
 
@@ -25,6 +27,7 @@ class Aplicacion(tk.Tk):
         super().__init__()
         self.autenticacion = autenticacion
         self.servicio_usuarios = ServicioUsuarios(autenticacion)
+        self.servicio_propietarios = ServicioPropietarios(autenticacion)
         self.vista = None
         self.title("Gestor De Veterinaria")
         self.geometry("660x620")
@@ -87,7 +90,84 @@ class Aplicacion(tk.Tk):
                 Dashboard, usuario=self.autenticacion.usuario_actual, permisos=permisos,
                 on_pruebas=self.mostrar_pruebas, on_logout=self.cerrar_sesion,
                 on_usuarios=self.mostrar_usuarios,
+                on_propietarios=self.mostrar_propietarios,
             )
+
+    def _operar_propietarios(self, operacion, al_completar):
+        try:
+            resultado = operacion()
+        except PermisoDenegado as error:
+            self._acceso_denegado(str(error))
+        except ErrorValidacion as error:
+            self.vista.mostrar_error(str(error))
+        except sqlite3.Error:
+            if hasattr(self.vista, "mostrar_error"):
+                self.vista.mostrar_error(ERROR_DATOS)
+            else:
+                messagebox.showerror("Gestor De Veterinaria", ERROR_DATOS, parent=self)
+        else:
+            al_completar(resultado)
+
+    def mostrar_propietarios(self, busqueda="", mensaje="", seleccionar=None):
+        def consultar():
+            propietarios = self.servicio_propietarios.buscar(busqueda)
+            permisos = self.autenticacion.permisos_actuales()
+            return propietarios, "gestionar_propietarios" in permisos
+
+        def mostrar(resultado):
+            propietarios, puede_gestionar = resultado
+            self._cambiar_vista(
+                Propietarios, propietarios=propietarios, puede_gestionar=puede_gestionar,
+                busqueda=busqueda, seleccionar=seleccionar,
+                on_buscar=lambda texto: self.mostrar_propietarios(busqueda=texto),
+                on_seleccionar=self._detalle_propietario,
+                on_registrar=lambda: self._registrar_propietario(busqueda),
+                on_editar=lambda id: self._editar_propietario(id, busqueda),
+                on_volver=self.mostrar_dashboard,
+            )
+            if mensaje:
+                self.vista.mensaje.set(mensaje)
+        self._operar_propietarios(consultar, mostrar)
+
+    def _detalle_propietario(self, propietario_id):
+        self._operar_propietarios(
+            lambda: self.servicio_propietarios.obtener(propietario_id), self.vista.mostrar_detalle,
+        )
+
+    def _registrar_propietario(self, busqueda=""):
+        self._operar_propietarios(
+            lambda: self.autenticacion.exigir_permiso("gestionar_propietarios"),
+            lambda _: self._cambiar_vista(
+                FormularioPropietario, on_submit=self._guardar_propietario_nuevo,
+                on_cancel=lambda: self.mostrar_propietarios(busqueda=busqueda),
+            ),
+        )
+
+    def _guardar_propietario_nuevo(self, **datos):
+        self._operar_propietarios(
+            lambda: self.servicio_propietarios.registrar(**datos),
+            lambda propietario: self.mostrar_propietarios(
+                mensaje="Propietario registrado correctamente.", seleccionar=propietario.id,
+            ),
+        )
+
+    def _editar_propietario(self, propietario_id, busqueda=""):
+        def consultar():
+            self.autenticacion.exigir_permiso("gestionar_propietarios")
+            return self.servicio_propietarios.obtener(propietario_id)
+
+        def mostrar(propietario):
+            self._cambiar_vista(
+                FormularioPropietario, propietario=propietario,
+                on_cancel=lambda: self.mostrar_propietarios(busqueda=busqueda),
+                on_submit=lambda **datos: self._operar_propietarios(
+                    lambda: self.servicio_propietarios.modificar(propietario_id, **datos),
+                    lambda actualizado: self.mostrar_propietarios(
+                        mensaje="Propietario actualizado correctamente.", seleccionar=actualizado.id,
+                    ),
+                ),
+            )
+        self._operar_propietarios(consultar, mostrar)
 
     def _operar_usuarios(self, operacion, al_completar):
         try:
