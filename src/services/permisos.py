@@ -2,7 +2,7 @@
 
 PERMISOS_POR_ROL = {
     "ADMINISTRADOR": frozenset({
-        "gestionar_propietarios", "consultar_propietarios", "gestionar_mascotas", "gestionar_citas",
+        "gestionar_propietarios", "consultar_propietarios", "gestionar_mascotas", "consultar_mascotas", "gestionar_citas",
         "consultar_consultas", "consultar_historial", "gestionar_usuarios", "usar_pruebas",
     }),
     "VETERINARIO": frozenset({

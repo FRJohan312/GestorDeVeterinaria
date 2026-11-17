@@ -14,7 +14,7 @@ CAMPOS = (
 
 class Propietarios(ttk.Frame):
     def __init__(self, master, propietarios, puede_gestionar, on_buscar, on_seleccionar,
-                 on_registrar, on_editar, on_volver, busqueda="", seleccionar=None):
+                 on_registrar, on_editar, on_volver, busqueda="", seleccionar=None, on_mascotas=None):
         super().__init__(master, padding=24)
         self._on_buscar = on_buscar
         self._on_seleccionar = on_seleccionar
@@ -84,6 +84,13 @@ class Propietarios(ttk.Frame):
                 command=lambda: self._editar(on_editar),
             )
             self.boton_editar.grid(row=0, column=1, sticky="ew", padx=(4, 0))
+        self.boton_mascotas = None
+        if on_mascotas is not None:
+            self.boton_mascotas = ttk.Button(
+                acciones, text="Ver mascotas del propietario", state="disabled",
+                command=lambda: self._editar(on_mascotas),
+            )
+            self.boton_mascotas.grid(row=1, column=0, columnspan=2, sticky="ew", pady=4)
         ttk.Button(self, text="Volver al panel", command=on_volver).grid(row=8, column=0, sticky="ew", pady=4)
         for propietario in propietarios:
             self.tabla.insert("", "end", iid=str(propietario.id), values=tuple(
@@ -107,6 +114,8 @@ class Propietarios(ttk.Frame):
         seleccion = self.tabla.selection()
         if self.boton_editar is not None:
             self.boton_editar.state(["!disabled"] if seleccion else ["disabled"])
+        if self.boton_mascotas is not None:
+            self.boton_mascotas.state(["!disabled"] if seleccion else ["disabled"])
         if seleccion:
             self._on_seleccionar(int(seleccion[0]))
         else:
