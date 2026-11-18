@@ -168,4 +168,10 @@ BEFORE DELETE ON consultas
 BEGIN
     SELECT RAISE(ABORT, 'No se permite eliminar consultas del historial medico');
 END;
+
+CREATE TRIGGER IF NOT EXISTS tratamientos_conservar_historial
+BEFORE DELETE ON tratamientos
+BEGIN
+    SELECT RAISE(ABORT, 'No se permite eliminar tratamientos del historial medico');
+END;
 """
