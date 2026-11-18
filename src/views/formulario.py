@@ -6,7 +6,7 @@ from tkinter import ttk
 
 class Formulario(ttk.Frame):
     def __init__(self, master, titulo, descripcion, campos, texto_boton, on_submit,
-                 *, opciones=None, on_cancel=None):
+                 *, opciones=None, on_cancel=None, constructores=None):
         super().__init__(master, padding=30)
         self._on_submit = on_submit
         self._enviando = False
@@ -25,7 +25,9 @@ class Formulario(ttk.Frame):
         for clave, etiqueta, secreto in campos:
             ttk.Label(self, text=etiqueta).grid(row=fila, column=0, sticky="w", pady=(6, 2))
             variable = tk.StringVar(self)
-            if opciones and clave in opciones:
+            if constructores and clave in constructores:
+                entrada = constructores[clave](self, variable)
+            elif opciones and clave in opciones:
                 entrada = ttk.Combobox(self, textvariable=variable, values=opciones[clave], state="readonly")
             else:
                 entrada = ttk.Entry(self, textvariable=variable, show="*" if secreto else "")

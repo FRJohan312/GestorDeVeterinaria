@@ -33,6 +33,14 @@ class RepositorioUsuarios:
             "SELECT id, nombre, nombre_usuario, rol, activo FROM usuarios ORDER BY nombre COLLATE NOCASE, id"
         ).fetchall()
 
+    def listar_veterinarios(self, incluir_inactivos=False, usuario_id=None) -> list[sqlite3.Row]:
+        return self._db.execute(
+            """SELECT id, nombre, nombre_usuario, rol, activo FROM usuarios
+               WHERE rol='VETERINARIO' AND (? OR activo=1) AND (? IS NULL OR id=?)
+               ORDER BY nombre COLLATE NOCASE, id""",
+            (incluir_inactivos, usuario_id, usuario_id),
+        ).fetchall()
+
     def nombre_en_uso(self, nombre_usuario: str, excluir_id: int | None = None) -> bool:
         # NOCASE protege ASCII en SQLite; casefold también cubre nombres con tildes.
         return any(
