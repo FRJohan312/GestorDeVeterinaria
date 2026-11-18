@@ -13,7 +13,8 @@ class Consultas(ttk.Frame):
     alto_minimo = 740
 
     def __init__(self, master, consultas, mascotas, veterinarios, puede_registrar,
-                 on_buscar, on_seleccionar, on_registrar, on_volver, filtros=None, seleccionar=None):
+                 on_buscar, on_seleccionar, on_registrar, on_volver, filtros=None, seleccionar=None,
+                 on_tratamientos=None):
         super().__init__(master, padding=20)
         from .calendario import CalendarioFecha
 
@@ -87,7 +88,11 @@ class Consultas(ttk.Frame):
         if puede_registrar:
             self.boton_registrar = ttk.Button(self, text="Registrar consulta médica", command=on_registrar)
             self.boton_registrar.grid(row=7, column=0, sticky="ew", pady=4)
-        ttk.Button(self, text="Volver al panel", command=on_volver).grid(row=8, column=0, sticky="ew", pady=4)
+        self.boton_tratamientos = ttk.Button(self, text="Ver tratamientos", state="disabled",
+                                            command=lambda: on_tratamientos(int(self.tabla.selection()[0])))
+        if on_tratamientos is not None:
+            self.boton_tratamientos.grid(row=8, column=0, sticky="ew", pady=4)
+        ttk.Button(self, text="Volver al panel", command=on_volver).grid(row=9, column=0, sticky="ew", pady=4)
         for consulta in consultas:
             self.tabla.insert("", "end", iid=str(consulta.id), values=tuple(
                 getattr(consulta, c) if getattr(consulta, c) is not None else "" for c, _ in columnas
@@ -122,10 +127,12 @@ class Consultas(ttk.Frame):
 
     def _seleccion(self, event=None):
         self.mostrar_detalle(None)
+        self.boton_tratamientos.state(["disabled"])
         if self.tabla.selection():
             self._on_seleccionar(int(self.tabla.selection()[0]))
 
     def mostrar_detalle(self, consulta):
+        self.boton_tratamientos.state(["!disabled"] if consulta is not None else ["disabled"])
         texto = "Seleccione una atención para visualizar su información clínica."
         if consulta is not None:
             cita = f"{consulta.cita_id} — {consulta.cita_estado}" if consulta.cita_id is not None else "Sin cita"
@@ -246,9 +253,13 @@ class FormularioConsulta(ttk.Frame):
     def _cambio_mascota(self, event=None):
         indice = self.entradas["mascota_id"].current()
         if indice >= 0:
+            seleccion = self.entradas["cita_id"].current()
+            cita_id = self._citas[seleccion - 1].id if seleccion > 0 else None
+            self.error.set("")
             citas = self._on_citas(self._mascotas[indice].id)
-            if self.winfo_exists() and citas is not None:
-                self.actualizar_citas(citas)
+            if self.winfo_exists():
+                # Un error conserva los textos, pero descarta las opciones de otra mascota.
+                self.actualizar_citas(citas if citas is not None else (), cita_id)
 
     def mostrar_error(self, mensaje):
         self.formulario.mostrar_error(mensaje)

@@ -14,6 +14,7 @@ from services.mascotas import ServicioMascotas
 from services.usuarios import ServicioUsuarios
 from services.citas import ESTADOS_ACTIVOS, ServicioCitas
 from services.consultas import ServicioConsultas
+from services.tratamientos import ServicioTratamientos
 from .configuracion_inicial import ConfiguracionInicial
 from .dashboard import Dashboard
 from .login import Login
@@ -23,6 +24,7 @@ from .mascotas import FormularioMascota, Mascotas
 from .usuarios import FormularioContrasena, FormularioUsuario, Usuarios
 from .citas import Citas, FormularioCita
 from .consultas import Consultas, FormularioConsulta
+from .tratamientos import Tratamientos, FormularioTratamiento
 
 
 ERROR_DATOS = "No se pudo acceder a los datos. Compruebe que el archivo esté disponible e inténtelo de nuevo."
@@ -37,6 +39,7 @@ class Aplicacion(tk.Tk):
         self.servicio_mascotas = ServicioMascotas(autenticacion)
         self.servicio_citas = ServicioCitas(autenticacion)
         self.servicio_consultas = ServicioConsultas(autenticacion)
+        self.servicio_tratamientos = ServicioTratamientos(autenticacion)
         self.vista = None
         self.title("Gestor De Veterinaria")
         self.geometry("660x620")
@@ -326,6 +329,9 @@ class Aplicacion(tk.Tk):
                 on_buscar=lambda nuevos: self.mostrar_consultas(filtros=nuevos),
                 on_seleccionar=self._detalle_consulta, on_registrar=self._formulario_consulta,
                 on_volver=self.mostrar_dashboard,
+                on_tratamientos=lambda id: self.mostrar_tratamientos(
+                    id, volver=lambda: self.mostrar_consultas(filtros=filtros, seleccionar=id),
+                ),
             )
             if mensaje:
                 self.vista.mensaje.set(mensaje)
@@ -360,11 +366,57 @@ class Aplicacion(tk.Tk):
                 FormularioConsulta, mascotas=mascotas, citas=citas, cita=cita,
                 usuario=self.autenticacion.usuario_actual, on_submit=guardar,
                 on_cancel=self.mostrar_consultas,
-                on_citas=lambda mascota_id: self._operar_modulo(
-                    lambda: self.servicio_consultas.citas_disponibles(mascota_id), lambda resultado: resultado,
-                ),
+                on_citas=self._citas_para_consulta,
             )
         self._operar_modulo(consultar, mostrar)
+
+    def _citas_para_consulta(self, mascota_id):
+        """Devuelve las opciones al formulario sin reconstruirlo; None indica error."""
+        return self._operar_modulo(
+            lambda: self.servicio_consultas.citas_disponibles(mascota_id), lambda citas: citas,
+        )
+
+    def mostrar_tratamientos(self, consulta_id, mensaje="", seleccionar=None, volver=None):
+        volver = volver or (lambda: self.mostrar_consultas(seleccionar=consulta_id))
+
+        def consultar():
+            consulta = self.servicio_consultas.obtener(consulta_id)
+            tratamientos = self.servicio_tratamientos.listar(consulta_id)
+            puede_registrar = self.servicio_tratamientos.puede_registrar(consulta_id)
+            return consulta, tratamientos, puede_registrar
+
+        def mostrar(resultado):
+            consulta, tratamientos, puede_registrar = resultado
+            self._cambiar_vista(
+                Tratamientos, consulta=consulta, tratamientos=tratamientos, puede_registrar=puede_registrar,
+                seleccionar=seleccionar,
+                on_seleccionar=lambda id: self._operar_modulo(
+                    lambda: self.servicio_tratamientos.obtener(consulta_id, id), self.vista.mostrar_detalle,
+                ),
+                on_registrar=lambda: self._formulario_tratamiento(consulta_id, volver), on_volver=volver,
+            )
+            if mensaje:
+                self.vista.mensaje.set(mensaje)
+        self._operar_modulo(consultar, mostrar)
+
+    def _formulario_tratamiento(self, consulta_id, volver=None):
+        def consultar():
+            if not self.servicio_tratamientos.puede_registrar(consulta_id):
+                raise PermisoDenegado("Solo el veterinario responsable puede registrar tratamientos para esta consulta.")
+            return self.servicio_consultas.obtener(consulta_id)
+
+        def guardar(**datos):
+            self._operar_modulo(
+                lambda: self.servicio_tratamientos.registrar(consulta_id, **datos),
+                lambda tratamiento: self.mostrar_tratamientos(
+                    consulta_id, mensaje="Tratamiento registrado correctamente.", seleccionar=tratamiento.id, volver=volver,
+                ),
+            )
+
+        self._operar_modulo(consultar, lambda consulta: self._cambiar_vista(
+            FormularioTratamiento, consulta=consulta, on_submit=guardar,
+            on_cancel=lambda: self.mostrar_tratamientos(consulta_id, volver=volver),
+        ))
 
     def _operar_usuarios(self, operacion, al_completar):
         try:
