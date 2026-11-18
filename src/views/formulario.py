@@ -32,7 +32,8 @@ class Formulario(ttk.Frame):
             else:
                 entrada = ttk.Entry(self, textvariable=variable, show="*" if secreto else "")
             entrada.grid(row=fila + 1, column=0, sticky="ew")
-            entrada.bind("<Return>", self.enviar)
+            if not isinstance(entrada, tk.Text):
+                entrada.bind("<Return>", self.enviar)
             self.valores[clave] = variable
             self.entradas[clave] = entrada
             if secreto:

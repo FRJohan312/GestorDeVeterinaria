@@ -13,6 +13,7 @@ from services.propietarios import ServicioPropietarios
 from services.mascotas import ServicioMascotas
 from services.usuarios import ServicioUsuarios
 from services.citas import ESTADOS_ACTIVOS, ServicioCitas
+from services.consultas import ServicioConsultas
 from .configuracion_inicial import ConfiguracionInicial
 from .dashboard import Dashboard
 from .login import Login
@@ -21,6 +22,7 @@ from .propietarios import FormularioPropietario, Propietarios
 from .mascotas import FormularioMascota, Mascotas
 from .usuarios import FormularioContrasena, FormularioUsuario, Usuarios
 from .citas import Citas, FormularioCita
+from .consultas import Consultas, FormularioConsulta
 
 
 ERROR_DATOS = "No se pudo acceder a los datos. Compruebe que el archivo esté disponible e inténtelo de nuevo."
@@ -34,6 +36,7 @@ class Aplicacion(tk.Tk):
         self.servicio_propietarios = ServicioPropietarios(autenticacion)
         self.servicio_mascotas = ServicioMascotas(autenticacion)
         self.servicio_citas = ServicioCitas(autenticacion)
+        self.servicio_consultas = ServicioConsultas(autenticacion)
         self.vista = None
         self.title("Gestor De Veterinaria")
         self.geometry("660x620")
@@ -50,7 +53,7 @@ class Aplicacion(tk.Tk):
             raise
 
     def _cambiar_vista(self, clase, **opciones):
-        self.minsize(560, getattr(clase, "alto_minimo", 580))
+        self.minsize(getattr(clase, "ancho_minimo", 560), getattr(clase, "alto_minimo", 580))
         if self.vista is not None:
             self.vista.destroy()
         self.vista = clase(self, **opciones)
@@ -100,6 +103,7 @@ class Aplicacion(tk.Tk):
                 on_propietarios=self.mostrar_propietarios,
                 on_mascotas=self.mostrar_mascotas,
                 on_citas=self.mostrar_citas,
+                on_consultas=self.mostrar_consultas,
             )
 
     def _operar_modulo(self, operacion, al_completar):
@@ -118,7 +122,7 @@ class Aplicacion(tk.Tk):
             else:
                 messagebox.showerror("Gestor De Veterinaria", ERROR_DATOS, parent=self)
         else:
-            al_completar(resultado)
+            return al_completar(resultado)
 
     def mostrar_propietarios(self, busqueda="", mensaje="", seleccionar=None):
         def consultar():
@@ -258,6 +262,7 @@ class Aplicacion(tk.Tk):
                 on_editar=self._formulario_cita,
                 on_estado=lambda id, estado: self._cambiar_estado_cita(id, estado, filtros),
                 on_volver=self.mostrar_dashboard,
+                on_consulta=self._formulario_consulta if self.autenticacion.usuario_actual.rol == "VETERINARIO" else None,
             )
             if mensaje:
                 self.vista.mensaje.set(mensaje)
@@ -302,6 +307,64 @@ class Aplicacion(tk.Tk):
             return
         self._operar_modulo(lambda: self.servicio_citas.cambiar_estado(cita_id, estado),
                             lambda _: self.mostrar_citas(filtros=filtros, mensaje=f"Estado actualizado: {estado}.", seleccionar=cita_id))
+
+    def mostrar_consultas(self, filtros=None, mensaje="", seleccionar=None):
+        filtros = filtros or {}
+
+        def consultar():
+            consultas = self.servicio_consultas.buscar(**filtros)
+            mascotas = self.servicio_consultas.mascotas_disponibles()
+            veterinarios = self.servicio_consultas.veterinarios_disponibles()
+            permisos = self.autenticacion.permisos_actuales()
+            return consultas, mascotas, veterinarios, "registrar_consultas" in permisos
+
+        def mostrar(resultado):
+            consultas, mascotas, veterinarios, puede_registrar = resultado
+            self._cambiar_vista(
+                Consultas, consultas=consultas, mascotas=mascotas, veterinarios=veterinarios,
+                puede_registrar=puede_registrar, filtros=filtros, seleccionar=seleccionar,
+                on_buscar=lambda nuevos: self.mostrar_consultas(filtros=nuevos),
+                on_seleccionar=self._detalle_consulta, on_registrar=self._formulario_consulta,
+                on_volver=self.mostrar_dashboard,
+            )
+            if mensaje:
+                self.vista.mensaje.set(mensaje)
+        self._operar_modulo(consultar, mostrar)
+
+    def _detalle_consulta(self, consulta_id):
+        self._operar_modulo(lambda: self.servicio_consultas.obtener(consulta_id), self.vista.mostrar_detalle)
+
+    def _formulario_consulta(self, cita_id=None):
+        def consultar():
+            self.autenticacion.exigir_permiso("registrar_consultas")
+            mascotas = self.servicio_consultas.mascotas_disponibles()
+            if not mascotas:
+                raise ErrorValidacion("Registre primero una mascota antes de atender una consulta.")
+            citas = self.servicio_consultas.citas_disponibles()
+            cita = None
+            if cita_id is not None:
+                cita = next((c for c in citas if c.id == cita_id), None)
+                if cita is None:
+                    raise ErrorValidacion("La cita ya fue atendida o no está disponible para este veterinario.")
+            return mascotas, citas, cita
+
+        def guardar(**datos):
+            self._operar_modulo(lambda: self.servicio_consultas.registrar(**datos),
+                                lambda consulta: self.mostrar_consultas(
+                                    mensaje="Consulta médica guardada correctamente.", seleccionar=consulta.id,
+                                ))
+
+        def mostrar(resultado):
+            mascotas, citas, cita = resultado
+            self._cambiar_vista(
+                FormularioConsulta, mascotas=mascotas, citas=citas, cita=cita,
+                usuario=self.autenticacion.usuario_actual, on_submit=guardar,
+                on_cancel=self.mostrar_consultas,
+                on_citas=lambda mascota_id: self._operar_modulo(
+                    lambda: self.servicio_consultas.citas_disponibles(mascota_id), lambda resultado: resultado,
+                ),
+            )
+        self._operar_modulo(consultar, mostrar)
 
     def _operar_usuarios(self, operacion, al_completar):
         try:

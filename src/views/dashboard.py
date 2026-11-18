@@ -15,7 +15,7 @@ SECCIONES = (
 
 class Dashboard(ttk.Frame):
     def __init__(self, master, usuario, permisos, on_pruebas, on_logout, on_usuarios=None,
-                 on_propietarios=None, on_mascotas=None, on_citas=None):
+                 on_propietarios=None, on_mascotas=None, on_citas=None, on_consultas=None):
         super().__init__(master, padding=30)
         self.columnconfigure(0, weight=1)
         ttk.Label(self, text="Gestor De Veterinaria", font=("Arial", 20, "bold")).grid(
@@ -37,6 +37,8 @@ class Dashboard(ttk.Frame):
                         boton = ttk.Button(self, text="Mascotas", command=on_mascotas)
                     elif titulo == "Citas" and on_citas is not None:
                         boton = ttk.Button(self, text="Citas", command=on_citas)
+                    elif titulo == "Consultas" and on_consultas is not None:
+                        boton = ttk.Button(self, text="Consultas", command=on_consultas)
                     else:
                         boton = ttk.Button(self, text=f"{titulo} — {accion} pendiente", state="disabled")
                     boton.grid(row=fila, column=0, sticky="ew", pady=4)
