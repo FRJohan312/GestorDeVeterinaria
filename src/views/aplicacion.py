@@ -12,6 +12,7 @@ from services.prototipo import contar_registros, guardar_prueba
 from services.propietarios import ServicioPropietarios
 from services.mascotas import ServicioMascotas
 from services.usuarios import ServicioUsuarios
+from services.citas import ESTADOS_ACTIVOS, ServicioCitas
 from .configuracion_inicial import ConfiguracionInicial
 from .dashboard import Dashboard
 from .login import Login
@@ -19,6 +20,7 @@ from .pruebas import Pruebas
 from .propietarios import FormularioPropietario, Propietarios
 from .mascotas import FormularioMascota, Mascotas
 from .usuarios import FormularioContrasena, FormularioUsuario, Usuarios
+from .citas import Citas, FormularioCita
 
 
 ERROR_DATOS = "No se pudo acceder a los datos. Compruebe que el archivo esté disponible e inténtelo de nuevo."
@@ -31,6 +33,7 @@ class Aplicacion(tk.Tk):
         self.servicio_usuarios = ServicioUsuarios(autenticacion)
         self.servicio_propietarios = ServicioPropietarios(autenticacion)
         self.servicio_mascotas = ServicioMascotas(autenticacion)
+        self.servicio_citas = ServicioCitas(autenticacion)
         self.vista = None
         self.title("Gestor De Veterinaria")
         self.geometry("660x620")
@@ -96,6 +99,7 @@ class Aplicacion(tk.Tk):
                 on_usuarios=self.mostrar_usuarios,
                 on_propietarios=self.mostrar_propietarios,
                 on_mascotas=self.mostrar_mascotas,
+                on_citas=self.mostrar_citas,
             )
 
     def _operar_modulo(self, operacion, al_completar):
@@ -234,6 +238,70 @@ class Aplicacion(tk.Tk):
                 on_cancel=lambda: self.mostrar_mascotas(propietario_id=propietario_id, volver=volver),
             )
         self._operar_modulo(consultar, mostrar)
+
+    def mostrar_citas(self, filtros=None, mensaje="", seleccionar=None):
+        filtros = filtros or {}
+
+        def consultar():
+            citas = self.servicio_citas.buscar(**filtros)
+            mascotas = self.servicio_citas.mascotas_disponibles()
+            veterinarios = self.servicio_citas.veterinarios_disponibles(incluir_inactivos=True)
+            return citas, mascotas, veterinarios, "gestionar_citas" in self.autenticacion.permisos_actuales()
+
+        def mostrar(resultado):
+            citas, mascotas, veterinarios, puede_gestionar = resultado
+            self._cambiar_vista(
+                Citas, citas=citas, mascotas=mascotas, veterinarios=veterinarios,
+                puede_gestionar=puede_gestionar, filtros=filtros, seleccionar=seleccionar,
+                on_buscar=lambda nuevos: self.mostrar_citas(filtros=nuevos),
+                on_seleccionar=self._detalle_cita, on_programar=self._formulario_cita,
+                on_editar=self._formulario_cita,
+                on_estado=lambda id, estado: self._cambiar_estado_cita(id, estado, filtros),
+                on_volver=self.mostrar_dashboard,
+            )
+            if mensaje:
+                self.vista.mensaje.set(mensaje)
+        self._operar_modulo(consultar, mostrar)
+
+    def _detalle_cita(self, cita_id):
+        self._operar_modulo(lambda: self.servicio_citas.obtener(cita_id), self.vista.mostrar_detalle)
+
+    def _formulario_cita(self, cita_id=None):
+        def consultar():
+            self.autenticacion.exigir_permiso("gestionar_citas")
+            mascotas = self.servicio_citas.mascotas_disponibles()
+            veterinarios = self.servicio_citas.veterinarios_disponibles()
+            if not mascotas:
+                raise ErrorValidacion("Registre primero una mascota antes de programar citas.")
+            if not veterinarios:
+                raise ErrorValidacion("No hay veterinarios activos. Registre o active uno desde Usuarios.")
+            cita = self.servicio_citas.obtener(cita_id) if cita_id is not None else None
+            if cita is not None and (cita.estado not in ESTADOS_ACTIVOS or cita.consulta_id is not None):
+                raise ErrorValidacion("Esta cita no admite cambios de programación.")
+            return mascotas, veterinarios, cita
+
+        def guardar(**datos):
+            operacion = (lambda: self.servicio_citas.programar(**datos)) if cita_id is None else (
+                lambda: self.servicio_citas.modificar(cita_id, **datos)
+            )
+            self._operar_modulo(operacion, lambda cita: self.mostrar_citas(
+                mensaje="Cita programada correctamente." if cita_id is None else "Cita actualizada correctamente.",
+                seleccionar=cita.id,
+            ))
+
+        def mostrar(resultado):
+            mascotas, veterinarios, cita = resultado
+            self._cambiar_vista(FormularioCita, mascotas=mascotas, veterinarios=veterinarios, cita=cita,
+                                on_submit=guardar, on_cancel=self.mostrar_citas)
+        self._operar_modulo(consultar, mostrar)
+
+    def _cambiar_estado_cita(self, cita_id, estado, filtros=None):
+        if estado == "CANCELADA" and not messagebox.askyesno(
+            "Gestor De Veterinaria", "¿Desea cancelar esta cita? Se conservará en el historial.", parent=self
+        ):
+            return
+        self._operar_modulo(lambda: self.servicio_citas.cambiar_estado(cita_id, estado),
+                            lambda _: self.mostrar_citas(filtros=filtros, mensaje=f"Estado actualizado: {estado}.", seleccionar=cita_id))
 
     def _operar_usuarios(self, operacion, al_completar):
         try:
