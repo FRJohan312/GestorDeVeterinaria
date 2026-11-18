@@ -7,6 +7,6 @@ PERMISOS_POR_ROL = {
     }),
     "VETERINARIO": frozenset({
         "consultar_propietarios", "consultar_mascotas", "consultar_citas",
-        "registrar_consultas", "consultar_historial",
+        "registrar_consultas", "consultar_consultas", "consultar_historial",
     }),
 }

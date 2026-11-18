@@ -21,7 +21,8 @@ class Citas(ttk.Frame):
     alto_minimo = 780
 
     def __init__(self, master, citas, mascotas, veterinarios, puede_gestionar, on_buscar,
-                 on_seleccionar, on_programar, on_editar, on_estado, on_volver, filtros=None, seleccionar=None):
+                 on_seleccionar, on_programar, on_editar, on_estado, on_volver, filtros=None, seleccionar=None,
+                 on_consulta=None):
         super().__init__(master, padding=20)
         self._mascotas = list(mascotas)
         self._veterinarios = list(veterinarios)
@@ -118,6 +119,7 @@ class Citas(ttk.Frame):
             acciones.columnconfigure(columna, weight=1)
         self.boton_programar = None
         self.boton_editar = None
+        self.boton_consulta = None
         self.botones_estado = {}
         if puede_gestionar:
             self.boton_programar = ttk.Button(acciones, text="Programar cita", command=on_programar)
@@ -131,6 +133,10 @@ class Citas(ttk.Frame):
                                    command=lambda e=estado: self._seleccionar(lambda id: on_estado(id, e)))
                 boton.grid(row=1 + indice // 2, column=indice % 2, sticky="ew", padx=3, pady=3)
                 self.botones_estado[estado] = boton
+        if on_consulta is not None:
+            self.boton_consulta = ttk.Button(acciones, text="Registrar consulta", state="disabled",
+                                             command=lambda: self._seleccionar(on_consulta))
+            self.boton_consulta.grid(row=3, column=0, columnspan=2, sticky="ew", padx=3, pady=3)
         ttk.Button(self, text="Volver al panel", command=on_volver).grid(row=8, column=0, sticky="ew", pady=4)
         for cita in citas:
             self.tabla.insert("", "end", iid=str(cita.id), values=tuple(getattr(cita, c) for c, _ in columnas))
@@ -194,6 +200,9 @@ class Citas(ttk.Frame):
 
     def mostrar_detalle(self, cita):
         texto = "Seleccione una cita para consultar su detalle."
+        if self.boton_consulta is not None:
+            atendible = cita is not None and cita.estado in ("PROGRAMADA", "CONFIRMADA", "COMPLETADA") and cita.consulta_id is None
+            self.boton_consulta.state(["!disabled"] if atendible else ["disabled"])
         if self.boton_editar is not None:
             editable = cita is not None and cita.estado in ESTADOS_ACTIVOS and cita.consulta_id is None
             self.boton_editar.state(["!disabled"] if editable else ["disabled"])
@@ -222,19 +231,20 @@ MINUTOS = tuple(f"{minuto:02d}" for minuto in range(0, 60, 5))
 class SelectorHora(ttk.Frame):
     """Dos selectores; conserva la precisión de una hora histórica sin redondearla."""
 
-    def __init__(self, master, variable, original=None):
+    def __init__(self, master, variable, original=None, *, minutos_permitidos=MINUTOS, hora_inicial="09:00"):
         super().__init__(master)
         self._variable = variable
         self._original = original
+        self._minutos_permitidos = tuple(minutos_permitidos)
         self._trazas = []
-        self.hora = tk.StringVar(self, value=original[:2] if original else "09")
-        self.minuto = tk.StringVar(self, value=original[3:5] if original else "00")
+        self.hora = tk.StringVar(self, value=original[:2] if original else hora_inicial[:2])
+        self.minuto = tk.StringVar(self, value=original[3:5] if original else hora_inicial[3:5])
         self.columnconfigure(0, weight=1)
         self.columnconfigure(2, weight=1)
         ttk.Label(self, text="Hora").grid(row=0, column=0, sticky="w")
         ttk.Label(self, text="Minutos").grid(row=0, column=2, sticky="w")
         self.horas = ttk.Combobox(self, values=HORAS, textvariable=self.hora, state="readonly", width=5)
-        self.minutos = ttk.Combobox(self, values=MINUTOS, textvariable=self.minuto, state="readonly", width=5)
+        self.minutos = ttk.Combobox(self, values=self._minutos_permitidos, textvariable=self.minuto, state="readonly", width=5)
         self.horas.grid(row=1, column=0, sticky="ew")
         ttk.Label(self, text=":").grid(row=1, column=1, padx=8)
         self.minutos.grid(row=1, column=2, sticky="ew")
@@ -250,17 +260,19 @@ class SelectorHora(ttk.Frame):
     def _actualizar(self, *_):
         hora = self._original if self._es_original() else f"{self.hora.get()}:{self.minuto.get()}:00"
         self._variable.set(hora)
-        especial = self._original and (self._original[3:5] not in MINUTOS or self._original[6:] != "00")
+        especial = self._original and (self._original[3:5] not in self._minutos_permitidos or self._original[6:] != "00")
         if especial and self._es_original():
             self.aviso.set(f"Hora existente: {self._original}. Se conserva mientras no cambie la hora o los minutos.")
         else:
-            self.aviso.set("Formato de 24 horas; minutos en intervalos de cinco.")
+            self.aviso.set("Formato de 24 horas; minutos en intervalos de cinco." if self._minutos_permitidos == MINUTOS
+                           else "Formato de 24 horas; minutos de 00 a 59.")
 
     def obtener(self):
         if self.hora.get() not in HORAS:
             raise ErrorValidacion("Seleccione una hora entre 00 y 23.")
-        if not self._es_original() and self.minuto.get() not in MINUTOS:
-            raise ErrorValidacion("Seleccione los minutos en intervalos de cinco.")
+        if not self._es_original() and self.minuto.get() not in self._minutos_permitidos:
+            raise ErrorValidacion("Seleccione los minutos en intervalos de cinco." if self._minutos_permitidos == MINUTOS
+                                  else "Seleccione minutos válidos de la lista.")
         return self._original if self._es_original() else f"{self.hora.get()}:{self.minuto.get()}:00"
 
     def destroy(self):
