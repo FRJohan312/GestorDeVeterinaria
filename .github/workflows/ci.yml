@@ -1,0 +1,92 @@
+name: Calidad y empaquetado
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+
+jobs:
+  validar:
+    name: Python y Docker sin interfaz gráfica
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Preparar Python
+        uses: actions/setup-python@v7.1.0
+        with:
+          python-version: '3.12'
+
+      - name: Comprobar sintaxis Python
+        run: python -m compileall -q src
+
+      # tests/ permanece local: estas comprobaciones no ejecutan unittest.
+      - name: Comprobar importaciones e inicialización con SQLite temporal
+        env:
+          PYTHONPATH: src
+        run: |
+          python - <<'PY'
+          import importlib
+          import pkgutil
+          import tempfile
+          from pathlib import Path
+
+          for nombre in ("models", "database", "services"):
+              paquete = importlib.import_module(nombre)
+              for modulo in pkgutil.walk_packages(paquete.__path__, paquete.__name__ + "."):
+                  importlib.import_module(modulo.name)
+
+          from database import conexion
+          from services.autenticacion import ServicioAutenticacion
+          from services.prototipo import inicializar_aplicacion
+
+          with tempfile.TemporaryDirectory() as directorio:
+              ruta = Path(directorio) / "comprobacion.db"
+              inicializar_aplicacion(ruta)
+              with conexion(ruta) as db:
+                  db.execute("INSERT INTO pruebas DEFAULT VALUES")
+              inicializar_aplicacion(ruta)
+              with conexion(ruta) as db:
+                  tablas = {fila[0] for fila in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+                  esperadas = {"usuarios", "propietarios", "mascotas", "citas", "consultas", "tratamientos", "pruebas"}
+                  if not esperadas <= tablas:
+                      raise RuntimeError("Faltan tablas de la aplicación")
+                  if db.execute("PRAGMA foreign_keys").fetchone()[0] != 1:
+                      raise RuntimeError("Las claves foráneas no están activadas")
+                  if db.execute("SELECT count(*) FROM pruebas").fetchone()[0] != 1:
+                      raise RuntimeError("La inicialización no conservó los datos temporales")
+                  if db.execute("PRAGMA integrity_check").fetchone()[0] != "ok" or db.execute("PRAGMA foreign_key_check").fetchall():
+                      raise RuntimeError("Falló la integridad SQLite")
+              if not ServicioAutenticacion(ruta).requiere_configuracion():
+                  raise RuntimeError("La base temporal debe comenzar sin usuarios")
+          print("Importaciones e inicialización verificadas sin abrir ventanas ni usar la base real.")
+          PY
+
+      - name: Construir imagen Docker
+        run: docker build --tag gestordeveterinaria:ci .
+
+      - name: Comprobar dependencias gráficas de la imagen sin abrir ventanas
+        run: |
+          docker run --rm --network none --mount type=tmpfs,destination=/app/data \
+            --env PYTHONDONTWRITEBYTECODE=1 --entrypoint python3 \
+            gestordeveterinaria:ci -c '
+          import importlib
+          import pkgutil
+          import sys
+          sys.path.insert(0, "/app/src")
+          import tkinter
+          import tkcalendar
+          import views
+          for modulo in pkgutil.walk_packages(views.__path__, views.__name__ + "."):
+              importlib.import_module(modulo.name)
+          import main
+          print("Vistas y punto de entrada importados; no se ha iniciado Tkinter.")
+          '
