@@ -14,7 +14,7 @@ def etiqueta_propietario(propietario):
 class Mascotas(ttk.Frame):
     def __init__(self, master, mascotas, propietarios, puede_gestionar, on_buscar,
                  on_seleccionar, on_registrar, on_editar, on_propietarios, on_volver,
-                 busqueda="", propietario_id=None, seleccionar=None):
+                 busqueda="", propietario_id=None, seleccionar=None, on_historial=None):
         super().__init__(master, padding=20)
         self._propietarios = list(propietarios)
         self._on_buscar = on_buscar
@@ -101,6 +101,11 @@ class Mascotas(ttk.Frame):
         ttk.Button(acciones, text="Volver", command=on_volver).grid(
             row=1, column=1, sticky="ew", padx=(4, 0), pady=4
         )
+        self.boton_historial = None
+        if on_historial is not None:
+            self.boton_historial = ttk.Button(acciones, text="Ver historial médico", state="disabled",
+                                             command=lambda: self._editar(on_historial))
+            self.boton_historial.grid(row=2, column=0, columnspan=2, sticky="ew", pady=4)
         for mascota in mascotas:
             self.tabla.insert("", "end", iid=str(mascota.id), values=tuple(
                 getattr(mascota, clave) or "" for clave, _ in columnas
@@ -136,6 +141,8 @@ class Mascotas(ttk.Frame):
             self.mostrar_error("Seleccione una mascota de la tabla.")
 
     def mostrar_detalle(self, mascota):
+        if self.boton_historial is not None:
+            self.boton_historial.state(["!disabled"] if mascota is not None else ["disabled"])
         texto = "Seleccione una mascota para consultar sus datos."
         if mascota is not None:
             texto = (f"Nombre: {mascota.nombre}\nEspecie: {mascota.especie}\n"
