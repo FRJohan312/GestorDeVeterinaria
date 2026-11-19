@@ -15,6 +15,7 @@ from services.usuarios import ServicioUsuarios
 from services.citas import ESTADOS_ACTIVOS, ServicioCitas
 from services.consultas import ServicioConsultas
 from services.tratamientos import ServicioTratamientos
+from services.historial import ServicioHistorial
 from .configuracion_inicial import ConfiguracionInicial
 from .dashboard import Dashboard
 from .login import Login
@@ -25,6 +26,7 @@ from .usuarios import FormularioContrasena, FormularioUsuario, Usuarios
 from .citas import Citas, FormularioCita
 from .consultas import Consultas, FormularioConsulta
 from .tratamientos import Tratamientos, FormularioTratamiento
+from .historial import Historial
 
 
 ERROR_DATOS = "No se pudo acceder a los datos. Compruebe que el archivo esté disponible e inténtelo de nuevo."
@@ -40,6 +42,7 @@ class Aplicacion(tk.Tk):
         self.servicio_citas = ServicioCitas(autenticacion)
         self.servicio_consultas = ServicioConsultas(autenticacion)
         self.servicio_tratamientos = ServicioTratamientos(autenticacion)
+        self.servicio_historial = ServicioHistorial(autenticacion)
         self.vista = None
         self.title("Gestor De Veterinaria")
         self.geometry("660x620")
@@ -107,6 +110,7 @@ class Aplicacion(tk.Tk):
                 on_mascotas=self.mostrar_mascotas,
                 on_citas=self.mostrar_citas,
                 on_consultas=self.mostrar_consultas,
+                on_historial=self.mostrar_historial,
             )
 
     def _operar_modulo(self, operacion, al_completar):
@@ -198,10 +202,10 @@ class Aplicacion(tk.Tk):
             mascotas = self.servicio_mascotas.buscar(busqueda, propietario_id)
             propietarios = self.servicio_mascotas.propietarios_disponibles()
             permisos = self.autenticacion.permisos_actuales()
-            return mascotas, propietarios, "gestionar_mascotas" in permisos
+            return mascotas, propietarios, "gestionar_mascotas" in permisos, "consultar_historial" in permisos
 
         def mostrar(resultado):
-            mascotas, propietarios, puede_gestionar = resultado
+            mascotas, propietarios, puede_gestionar, puede_historial = resultado
             self._cambiar_vista(
                 Mascotas, mascotas=mascotas, propietarios=propietarios, puede_gestionar=puede_gestionar,
                 busqueda=busqueda, propietario_id=propietario_id, seleccionar=seleccionar,
@@ -210,6 +214,11 @@ class Aplicacion(tk.Tk):
                 on_registrar=lambda: self._formulario_mascota(propietario_id=propietario_id, volver=volver),
                 on_editar=lambda id: self._formulario_mascota(id, propietario_id, volver),
                 on_propietarios=self.mostrar_propietarios, on_volver=volver,
+                on_historial=(lambda id: self.mostrar_historial(
+                    id, volver=lambda: self.mostrar_mascotas(
+                        busqueda=busqueda, propietario_id=propietario_id, seleccionar=id, volver=volver,
+                    ),
+                )) if puede_historial else None,
             )
             if mensaje:
                 self.vista.mensaje.set(mensaje)
@@ -217,6 +226,27 @@ class Aplicacion(tk.Tk):
 
     def _detalle_mascota(self, mascota_id):
         self._operar_modulo(lambda: self.servicio_mascotas.obtener(mascota_id), self.vista.mostrar_detalle)
+
+    def mostrar_historial(self, mascota_id=None, volver=None):
+        def consultar():
+            mascotas = self.servicio_historial.buscar_mascotas()
+            historial = self.servicio_historial.obtener(mascota_id) if mascota_id is not None else None
+            return mascotas, historial
+
+        def mostrar(resultado):
+            mascotas, historial = resultado
+            self._cambiar_vista(
+                Historial, mascotas=mascotas, historial=historial,
+                on_buscar=self._buscar_mascotas_historial, on_consultar=self._cargar_historial,
+                on_volver=volver or self.mostrar_dashboard,
+            )
+        self._operar_modulo(consultar, mostrar)
+
+    def _buscar_mascotas_historial(self, termino):
+        self._operar_modulo(lambda: self.servicio_historial.buscar_mascotas(termino), self.vista.mostrar_mascotas)
+
+    def _cargar_historial(self, mascota_id):
+        self._operar_modulo(lambda: self.servicio_historial.obtener(mascota_id), self.vista.mostrar_historial)
 
     def _formulario_mascota(self, mascota_id=None, propietario_id=None, volver=None):
         def consultar():
