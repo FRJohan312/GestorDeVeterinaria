@@ -23,7 +23,7 @@ class Historial(ttk.Frame):
         self._tratamientos = {}
         self.columnconfigure(0, weight=1)
         self.rowconfigure(4, weight=1)
-        ttk.Label(self, text="Gestor De Veterinaria", font=("Arial", 20, "bold")).grid(row=0, column=0, sticky="w")
+        ttk.Label(self, text="Gestión de Historial", font=("Arial", 20, "bold")).grid(row=0, column=0, sticky="w")
         ttk.Label(self, text="Historial médico — solo lectura", font=("Arial", 14, "bold")).grid(row=1, column=0, sticky="w", pady=5)
         filtros = ttk.Frame(self)
         filtros.grid(row=2, column=0, sticky="ew", pady=4)

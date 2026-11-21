@@ -44,7 +44,7 @@ class Aplicacion(tk.Tk):
         self.servicio_tratamientos = ServicioTratamientos(autenticacion)
         self.servicio_historial = ServicioHistorial(autenticacion)
         self.vista = None
-        self.title("Gestor De Veterinaria")
+        self.title("VetSoft")
         self.geometry("660x620")
         self.minsize(560, 580)
         self.protocol("WM_DELETE_WINDOW", self.destroy)

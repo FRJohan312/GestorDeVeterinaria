@@ -13,7 +13,7 @@ class Usuarios(ttk.Frame):
         super().__init__(master, padding=24)
         self.columnconfigure(0, weight=1)
         self.rowconfigure(2, weight=1)
-        ttk.Label(self, text="Gestor De Veterinaria", font=("Arial", 20, "bold")).grid(
+        ttk.Label(self, text="Gestión de Usuarios", font=("Arial", 20, "bold")).grid(
             row=0, column=0, sticky="w", pady=(0, 12)
         )
         ttk.Label(self, text="Gestión de usuarios", font=("Arial", 14, "bold")).grid(

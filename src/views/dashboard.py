@@ -18,7 +18,7 @@ class Dashboard(ttk.Frame):
                  on_propietarios=None, on_mascotas=None, on_citas=None, on_consultas=None, on_historial=None):
         super().__init__(master, padding=30)
         self.columnconfigure(0, weight=1)
-        ttk.Label(self, text="Gestor De Veterinaria", font=("Arial", 20, "bold")).grid(
+        ttk.Label(self, text="Bienvenido a VetSoft", font=("Arial", 20, "bold")).grid(
             row=0, column=0, sticky="w", pady=(0, 12)
         )
         ttk.Label(self, text=f"Usuario: {usuario.nombre}\nRol: {usuario.rol}").grid(
@@ -49,7 +49,7 @@ class Dashboard(ttk.Frame):
                     break
         self.boton_pruebas = None
         if "usar_pruebas" in permisos:
-            self.boton_pruebas = ttk.Button(self, text="Pruebas del prototipo", command=on_pruebas)
+            self.boton_pruebas = ttk.Button(self, text="Pruebas del prototipo", command=on_pruebas, state="disabled")
             self.boton_pruebas.grid(row=fila, column=0, sticky="ew", pady=(16, 4))
             fila += 1
         self.boton_logout = ttk.Button(self, text="Cerrar sesión", command=on_logout)

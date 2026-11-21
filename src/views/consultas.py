@@ -26,7 +26,7 @@ class Consultas(ttk.Frame):
         self.columnconfigure(0, weight=1)
         self.rowconfigure(3, weight=1)
         filtros = filtros or {}
-        ttk.Label(self, text="Gestor De Veterinaria", font=("Arial", 20, "bold")).grid(row=0, column=0, sticky="w")
+        ttk.Label(self, text="Gestión de consultas", font=("Arial", 20, "bold")).grid(row=0, column=0, sticky="w")
         ttk.Label(self, text="Consultas veterinarias", font=("Arial", 14, "bold")).grid(row=1, column=0, sticky="w", pady=8)
         filtro = ttk.Frame(self)
         filtro.grid(row=2, column=0, sticky="ew", pady=6)

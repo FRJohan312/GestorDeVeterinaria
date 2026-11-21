@@ -7,7 +7,7 @@ from typing import Iterator
 
 
 # Se conserva el nombre histórico para reutilizar el volumen y sus datos.
-DB_PATH = Path(__file__).resolve().parents[2] / "data" / "GestorDeVeterinariar.db"
+DB_PATH = Path(__file__).resolve().parents[2] / "data" / "GestorDeVeterinaria.db"
 
 
 @contextmanager

@@ -20,7 +20,7 @@ class Tratamientos(ttk.Frame):
         self.consulta = consulta
         self.columnconfigure(0, weight=1)
         self.rowconfigure(3, weight=1)
-        ttk.Label(self, text="Gestor De Veterinaria", font=("Arial", 20, "bold")).grid(row=0, column=0, sticky="w")
+        ttk.Label(self, text="Gestión de Tratamientos", font=("Arial", 20, "bold")).grid(row=0, column=0, sticky="w")
         ttk.Label(self, text="Tratamientos", font=("Arial", 14, "bold")).grid(row=1, column=0, sticky="w", pady=8)
         ttk.Label(self, text=informacion_consulta(consulta), wraplength=510).grid(row=2, column=0, sticky="w", pady=6)
         panel = ttk.Frame(self)

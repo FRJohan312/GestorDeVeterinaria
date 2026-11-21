@@ -16,7 +16,7 @@ def main() -> int:
     except sqlite3.Error:
         ventana = tk.Tk()
         ventana.withdraw()
-        messagebox.showerror("Gestor De Veterinaria", ERROR_DATOS, parent=ventana)
+        messagebox.showerror("VetSoft", ERROR_DATOS, parent=ventana)
         ventana.destroy()
         return 1
     try:

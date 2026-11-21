@@ -31,7 +31,7 @@ class Citas(ttk.Frame):
         self._busqueda_fecha_pendiente = None
         self.columnconfigure(0, weight=1)
         self.rowconfigure(3, weight=1)
-        ttk.Label(self, text="Gestor De Veterinaria", font=("Arial", 20, "bold")).grid(
+        ttk.Label(self, text="Gestión de citas", font=("Arial", 20, "bold")).grid(
             row=0, column=0, sticky="w", pady=(0, 6)
         )
         ttk.Label(self, text="Citas" if puede_gestionar else "Mi agenda — solo consulta",

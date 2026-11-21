@@ -20,7 +20,7 @@ class Propietarios(ttk.Frame):
         self._on_seleccionar = on_seleccionar
         self.columnconfigure(0, weight=1)
         self.rowconfigure(3, weight=1)
-        ttk.Label(self, text="Gestor De Veterinaria", font=("Arial", 20, "bold")).grid(
+        ttk.Label(self, text="Gestión de Propietarios", font=("Arial", 20, "bold")).grid(
             row=0, column=0, sticky="w", pady=(0, 8)
         )
         ttk.Label(
